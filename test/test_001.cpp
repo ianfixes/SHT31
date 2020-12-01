@@ -1,10 +1,23 @@
 
 #include <ArduinoUnitTests.h>
+#include "SHT31.h"
 
-unittest(dummy_test)
+SHT31 sht;
+
+unittest(test_constructor)
 {
-  assertEqual(4, 4);
+  SHT31 sht;
+  assertNotEqual(sht, null);
 }
 
+unittest(test_begin)
+{
+  SHT31 sht;
+  assertNotEqual(sht, null);
+
+  bool b = sht.begin(0x44);
+  assertEqual(b, true);
+
+}
 unittest_main()
 
