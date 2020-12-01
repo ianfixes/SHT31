@@ -5,3 +5,7 @@ compile:
     - esp32
     - UNO
 
+packages:
+  adafruit:samd:
+    url: https://potato.github.io/arduino-board-index/package_adafruit_index.json
+
