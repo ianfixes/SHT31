@@ -2,7 +2,7 @@
 
 # SHT31
 
-Arduino library for the SHT31 temperature and humidity sensor [test]
+Arduino library for the SHT31 temperature and humidity sensor
 
 ## Description
 
