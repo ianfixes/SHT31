@@ -3,7 +3,7 @@ compile:
   platforms:
     - esp8266
     - esp32
-    - UNO
+    - uno
 
 packages:
   adafruit:samd:
