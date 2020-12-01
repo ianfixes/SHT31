@@ -7,13 +7,13 @@ SHT31 sht;
 unittest(test_constructor)
 {
   SHT31 sht;
-  assertNotEqual(sht, null);
+  assertNotEqual(sht, NULL);
 }
 
 unittest(test_begin)
 {
   SHT31 sht;
-  assertNotEqual(sht, null);
+  assertNotEqual(sht, NULL);
 
   bool b = sht.begin(0x44);
   assertEqual(b, true);
