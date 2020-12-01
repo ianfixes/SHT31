@@ -1,8 +1,8 @@
 //
-//    FILE: SHT31_async.ino
+//    FILE: SHT31_isConnected.ino
 //  AUTHOR: Rob Tillaart
 // VERSION: 0.1.0
-// PURPOSE: demo async interface
+// PURPOSE: demo  (needs 0.2.4 or up)
 //     URL: https://github.com/RobTillaart/SHT31
 
 #include "Wire.h"
@@ -12,9 +12,9 @@
 
 uint32_t start;
 uint32_t stop;
-uint32_t cnt;
 
 SHT31 sht;
+uint32_t connectionFails = 0;
 
 void setup()
 {
@@ -30,38 +30,33 @@ void setup()
   uint16_t stat = sht.readStatus();
   Serial.print(stat, HEX);
   Serial.println();
-  
-  sht.requestData();
-  cnt = 0;
 }
 
 void loop()
 {
-  if (sht.dataReady())
+  if ( sht.isConnected()  )
   {
     start = micros();
-    bool success  = sht.readData();   // default = true = fast
+    sht.read();         // default = true/fast       slow = false
     stop = micros();
-    sht.requestData();                // request for next sample
-
+    Serial.print(millis());
     Serial.print("\t");
     Serial.print(stop - start);
     Serial.print("\t");
-    if (success == false)
-    {
-      Serial.println("Failed read");
-    }
-    else
-    {
-      Serial.print(sht.getTemperature(), 1);
-      Serial.print("\t");
-      Serial.print(sht.getHumidity(), 1);
-      Serial.print("\t");
-      Serial.println(cnt);
-      cnt = 0;
-    }
+    Serial.print(sht.getTemperature(), 1);
+    Serial.print("\t");
+    Serial.print(sht.getHumidity(), 1);
   }
-  cnt++; // simulate other activity
+  else
+  {
+    connectionFails++;
+    Serial.print(millis());
+    Serial.print("\tNot connected:\t");
+    Serial.print(connectionFails);
+    // sht.reset();
+  }
+  Serial.println();
+  delay(100);
 }
 
 // -- END OF FILE --

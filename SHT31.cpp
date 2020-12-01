@@ -1,7 +1,7 @@
 //
 //    FILE: SHT31.cpp
 //  AUTHOR: Rob Tillaart
-// VERSION: 0.2.3
+// VERSION: 0.3.0
 //    DATE: 2019-02-08
 // PURPOSE: Arduino library for the SHT31 temperature and humidity sensor
 //          https://www.adafruit.com/product/2857
@@ -18,7 +18,8 @@
 // 0.2.1   2020-06-19 fix library.json
 // 0.2.2   2020-07-05 fix compiling for ESP
 // 0.2.3   2020-07-19 added CRC by PetrDa (thanks); cleanup
-//
+// 0.2.4   2020-11-29 added isConnected()
+// 0.3.0   2020-11-29 add low level I2C checks; + isHeaterOn()
 
 
 #include "SHT31.h"
@@ -49,7 +50,10 @@ SHT31::SHT31()
 #if defined(ESP8266) || defined(ESP32)
 bool SHT31::begin(const uint8_t address, const uint8_t dataPin, const uint8_t clockPin)
 {
-  if (address != 0x44 && address != 0x45) return false;
+  if (address != 0x44 && address != 0x45)
+  {
+    return false;
+  }
   _addr = address;
 
   _wire = &Wire;
@@ -59,8 +63,7 @@ bool SHT31::begin(const uint8_t address, const uint8_t dataPin, const uint8_t cl
   } else {
     _wire->begin();
   }
-  reset();
-  return true;
+  return reset();
 }
 #endif
 
@@ -71,68 +74,95 @@ bool SHT31::begin(const uint8_t address)
 
 bool SHT31::begin(const uint8_t address,  TwoWire *wire)
 {
-  if (address != 0x44 && address != 0x45) return false;
+  if (address != 0x44 && address != 0x45)
+  {
+    return false;
+  }
   _addr = address;
   _wire = wire;
   _wire->begin();
-  reset();
-  return true;
+  return reset();
 }
 
 bool SHT31::read(bool fast)
 {
-  writeCmd(fast ? SHT31_MEASUREMENT_FAST : SHT31_MEASUREMENT_SLOW);
+  if (writeCmd(fast ? SHT31_MEASUREMENT_FAST : SHT31_MEASUREMENT_SLOW) == false)
+  {
+    return false;
+  }
   delay(fast ? 4 : 15); // table 4 datasheet
   return readData(fast);
 }
 
-uint16_t SHT31::readStatus()
+bool SHT31::isConnected()
 {
-  uint32_t status = 0;
-  writeCmd(SHT31_READ_STATUS);        // page 13 datasheet
-  readBytes(3, (uint8_t*) &status);   // 16 bit status + CRC
-  // TODO CRC check
-
-  return (uint16_t) (status >> 8);
-
-  // bit - description
-  // ==================
-  // 15 Alert pending status
-  //    '0': no pending alerts
-  //    '1': at least one pending alert - default
-  // 14 Reserved ‘0’
-  // 13 Heater status
-  //    '0’ : Heater OFF - default
-  //    '1’ : Heater ON
-  // 12 Reserved '0’
-  // 11 Humidity tracking alert
-  //    '0’ : no alert - default
-  //    '1’ : alert
-  // 10 Temp tracking alert
-  //    '0’ : no alert - default
-  //    '1’ : alert
-  // 9:5 Reserved '00000’
-  // 4 System reset detected
-  //    '0': no reset since last ‘clear status register’ command
-  //    '1': reset detected (hard or soft reset command or supply fail) - default
-  // 3:2 Reserved ‘00’
-  // 1 Command status
-  //    '0': last cmd executed successfully
-  //    '1': last cmd not processed. Invalid or failed checksum
-  // 0 Write data checksum status
-  //    '0': checksum of last write correct
-  //    '1': checksum of last write transfer failed
+  _wire->beginTransmission(_addr);
+  int rv = _wire->endTransmission();
+  if (rv != 0) _error = SHT31_ERR_NOT_CONNECT;
+  return (rv == 0);
 }
 
-void SHT31::reset(bool hard)
+#ifdef doc
+// bit - description
+// ==================
+// 15 Alert pending status
+//    '0': no pending alerts
+//    '1': at least one pending alert - default
+// 14 Reserved ‘0’
+// 13 Heater status
+//    '0’ : Heater OFF - default
+//    '1’ : Heater ON
+// 12 Reserved '0’
+// 11 Humidity tracking alert
+//    '0’ : no alert - default
+//    '1’ : alert
+// 10 Temp tracking alert
+//    '0’ : no alert - default
+//    '1’ : alert
+// 9:5 Reserved '00000’
+// 4 System reset detected
+//    '0': no reset since last ‘clear status register’ command
+//    '1': reset detected (hard or soft reset command or supply fail) - default
+// 3:2 Reserved ‘00’
+// 1 Command status
+//    '0': last cmd executed successfully
+//    '1': last cmd not processed. Invalid or failed checksum
+// 0 Write data checksum status
+//    '0': checksum of last write correct
+//    '1': checksum of last write transfer failed
+#endif
+uint16_t SHT31::readStatus()
 {
-  if (hard)
+  uint8_t status[3] = { 0, 0, 0 };
+  // page 13 datasheet
+  if (writeCmd(SHT31_READ_STATUS) == false)
   {
-    writeCmd(SHT31_HARD_RESET);
-  } else {
-    writeCmd(SHT31_SOFT_RESET);
+    return 0xFFFF;
+  }
+  // 16 bit status + CRC
+  if (readBytes(3, (uint8_t*) &status[0]) == false)
+  {
+    return 0xFFFF;
+  }
+
+  if (status[2] != crc8(status, 2)) 
+  {
+    _error = SHT31_ERR_CRC_STATUS;
+    return 0xFFFF;
+  }
+
+  return (uint16_t) (status[0] << 8) + status[1];
+}
+
+bool SHT31::reset(bool hard)
+{
+  bool b = writeCmd(hard ? SHT31_HARD_RESET : SHT31_SOFT_RESET);
+  if (b == false)
+  {
+    return false;
   }
   delay(1);  // table 4 datasheet
+  return true;
 }
 
 void SHT31::setHeatTimeout(uint8_t seconds)
@@ -141,31 +171,50 @@ void SHT31::setHeatTimeout(uint8_t seconds)
   if (_heatTimeOut > 180) _heatTimeOut = 180;
 }
 
-void SHT31::heatOn()
+bool SHT31::heatOn()
 {
-  writeCmd(SHT31_HEAT_ON);
+  if (writeCmd(SHT31_HEAT_ON) == false)
+  {
+    return false;
+  }
   _heaterStart = millis();
+  return true;
 }
 
-void SHT31::heatOff()
+bool SHT31::heatOff()
 {
-  writeCmd(SHT31_HEAT_OFF);
+  if (writeCmd(SHT31_HEAT_OFF) == false)
+  {
+    _error = SHT31_ERR_HEATER_OFF;  // can be serious!
+    return false;
+  }
   _heaterStart = 0;
+  return true;
 }
 
-bool SHT31::heatUp()
+bool SHT31::isHeaterOn()
 {
-  if (_heaterStart == 0) return false;
+  if (_heaterStart == 0)
+  {
+    return false;
+  }
   // did not exceed time out
-  if (millis() - _heaterStart < (_heatTimeOut * 1000UL)) return true;
-  heatOff();
+  if (millis() - _heaterStart < (_heatTimeOut * 1000UL))
+  {
+    return true;
+  }
+  heatOff();     // should this be done here?
   return false;
 }
 
-void SHT31::requestData()
+bool SHT31::requestData()
 {
-  writeCmd(SHT31_MEASUREMENT_SLOW);
+  if (writeCmd(SHT31_MEASUREMENT_SLOW) == false)
+  {
+    return false;
+  }
   _lastRequest = millis();
+  return true;
 }
 
 bool SHT31::dataReady()
@@ -176,13 +225,21 @@ bool SHT31::dataReady()
 bool SHT31::readData(bool fast)
 {
   uint8_t buffer[6];
-  readBytes(6, (uint8_t*) &buffer[0]);
+  if (readBytes(6, (uint8_t*) &buffer[0]) == false)
+  {
+    return false;
+  }
 
   if (!fast)
   {
-    if (buffer[2] != crc8(buffer, 2) ||
-        buffer[5] != crc8(buffer + 3, 2)) 
+    if (buffer[2] != crc8(buffer, 2)) 
     {
+      _error = SHT31_ERR_CRC_TEMP;
+      return false;
+    }
+    if (buffer[5] != crc8(buffer + 3, 2)) 
+    {
+      _error = SHT31_ERR_CRC_HUM;
       return false;
     }
   }
@@ -195,6 +252,13 @@ bool SHT31::readData(bool fast)
   _lastRead = millis();
 
   return true;
+}
+
+uint8_t SHT31::getError()
+{
+  uint8_t rv = _error;
+  _error = SHT31_OK;
+  return rv;
 }
 
 //////////////////////////////////////////////////////////
@@ -217,21 +281,32 @@ uint8_t SHT31::crc8(const uint8_t *data, uint8_t len)
   return crc;
 }
 
-void SHT31::writeCmd(uint16_t cmd)
+bool SHT31::writeCmd(uint16_t cmd)
 {
   _wire->beginTransmission(_addr);
   _wire->write(cmd >> 8 );
   _wire->write(cmd & 0xFF);
-  _wire->endTransmission();
+  if (_wire->endTransmission() != 0)
+  {
+    _error = SHT31_ERR_WRITECMD;
+    return false;
+  }
+  return true;
 }
 
-void SHT31::readBytes(uint8_t n, uint8_t *val)
+bool SHT31::readBytes(uint8_t n, uint8_t *val)
 {
-  _wire->requestFrom(_addr, (uint8_t) n);
-  for (uint8_t i = 0; i < n; i++)
+  int rv = _wire->requestFrom(_addr, (uint8_t) n);
+  if (rv == n)
   {
-    val[i] = _wire->read();
+    for (uint8_t i = 0; i < n; i++)
+    {
+      val[i] = _wire->read();
+    }
+    return true;
   }
+  _error = SHT31_ERR_READBYTES;
+  return false;
 }
 
 // -- END OF FILE --
