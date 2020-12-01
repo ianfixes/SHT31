@@ -1,6 +1,5 @@
 
 #include <ArduinoUnitTests.h>
-#include "../do-something.h"
 
 unittest(dummy_test)
 {
