@@ -7,5 +7,5 @@ compile:
 
 packages:
   adafruit:samd:
-    url: https://potato.github.io/arduino-board-index/package_adafruit_index.json
+    url: https://adafruit.github.io/arduino-board-index/package_adafruit_index.json
 
