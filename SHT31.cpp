@@ -21,7 +21,6 @@
 // 0.2.4   2020-11-29 added isConnected()
 // 0.3.0   2020-11-29 add low level I2C checks; + isHeaterOn()
 
-
 #include "SHT31.h"
 
 // SUPPORTED COMMANDS - single shot mode only
@@ -131,6 +130,7 @@ bool SHT31::isConnected()
 //    '0': checksum of last write correct
 //    '1': checksum of last write transfer failed
 #endif
+
 uint16_t SHT31::readStatus()
 {
   uint8_t status[3] = { 0, 0, 0 };
