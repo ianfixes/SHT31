@@ -5,7 +5,3 @@ compile:
     - esp32
     - uno
 
-packages:
-  adafruit:samd:
-    url: https://adafruit.github.io/arduino-board-index/package_adafruit_index.json
-
