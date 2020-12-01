@@ -1,15 +1,6 @@
 compile:
   # Choosing to run compilation tests on 2 different Arduino platforms
   platforms:
-    - esp8266
-    - esp32
     - uno
 
-packages:
-  esp32:esp32:
-    url: https://dl.espressif.com/dl/package_esp32_index.json
-  esp8266:esp8266:
-    url: http://arduino.esp8266.com/stable/package_esp8266com_index.json
-  adafruit:samd:
-    url: https://adafruit.github.io/arduino-board-index/package_adafruit_index.json
 
